@@ -4,6 +4,7 @@ import { ArrowLeft, ImagePlus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { CATEGORY_GROUPS } from "@/shared/constants/category.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import {
   Card,
@@ -34,35 +35,6 @@ type VoteOption = {
 };
 
 const OPTION_COUNT = 2;
-type CategoryGroup = {
-  id: string;
-  label: string;
-  children: Array<{
-    id: string;
-    label: string;
-    description?: string;
-  }>;
-};
-
-const CATEGORY_GROUPS: CategoryGroup[] = [
-  {
-    id: "shopping",
-    label: "쇼핑",
-    children: [
-      {
-        id: "electronics",
-        label: "전자제품",
-        description: "가전, 모바일, 주변기기 등",
-      },
-      {
-        id: "fashion",
-        label: "패션",
-        description: "의류, 잡화, 뷰티 제품",
-      },
-    ],
-  },
-];
-
 export function WritePost() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -88,6 +60,14 @@ export function WritePost() {
     });
   };
 
+  const handleOptionNameChange = (id: string, value: string) => {
+    setOptions((prev) =>
+      prev.map((option) =>
+        option.id === id ? { ...option, name: value } : option
+      )
+    );
+  };
+
   const handleOptionDescriptionChange = (id: string, value: string) => {
     setOptions((prev) =>
       prev.map((option) =>
@@ -105,7 +85,9 @@ export function WritePost() {
   };
 
   const isSubmitDisabled = useMemo(() => {
-    const hasEmptyOption = options.some((option) => !option.description.trim());
+    const hasEmptyOption = options.some(
+      (option) => !option.name.trim() || !option.description.trim()
+    );
     return !title.trim() || !content.trim() || !categoryId || hasEmptyOption;
   }, [title, content, options, categoryId]);
 
@@ -187,12 +169,9 @@ export function WritePost() {
                     variant="outline"
                     className="w-full justify-between"
                   >
-                    <div className="flex flex-col text-left">
+                    <div className="flex items-center text-left">
                       <span className="text-sm font-semibold">
                         {selectedCategory?.label ?? "카테고리를 선택하세요"}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {selectedCategory?.groupLabel ?? "모든 카테고리"}
                       </span>
                     </div>
                     <span className="text-xs text-muted-foreground">변경</span>
@@ -234,11 +213,6 @@ export function WritePost() {
                                 />
                                 <div className="space-y-1">
                                   <p className="font-medium">{child.label}</p>
-                                  {child.description ? (
-                                    <p className="text-xs text-muted-foreground">
-                                      {child.description}
-                                    </p>
-                                  ) : null}
                                 </div>
                               </label>
                             ))}
@@ -281,7 +255,6 @@ export function WritePost() {
                     <p className="text-sm text-muted-foreground">
                       옵션 {index + 1}
                     </p>
-                    <h3 className="text-lg font-semibold">{option.name}</h3>
                   </div>
                   <span className="text-xs text-muted-foreground">
                     필수 입력
@@ -289,6 +262,18 @@ export function WritePost() {
                 </div>
 
                 <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor={`${option.id}-name`}>제목</Label>
+                    <Input
+                      id={`${option.id}-name`}
+                      value={option.name}
+                      onChange={(event) =>
+                        handleOptionNameChange(option.id, event.target.value)
+                      }
+                      required
+                    />
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor={`${option.id}-description`}>내용</Label>
                     <Textarea
@@ -327,7 +312,7 @@ export function WritePost() {
                         <div className="flex items-center gap-2">
                           <ImagePlus className="size-4 text-muted-foreground" />
                           <div>
-                            <p className="font-medium">
+                            <p className="font-medium text-ellipsis overflow-hidden whitespace-nowrap max-w-[200px]">
                               {option.imageFile.name}
                             </p>
                             <p className="text-xs text-muted-foreground">
