@@ -2,8 +2,18 @@
 
 import { ArrowLeft, ImagePlus, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
 
+import { zodResolver } from "@hookform/resolvers/zod";
+import { toast } from "sonner";
+
+import { createVote } from "@/features/write-post/api/create-vote.ts";
+import {
+  OPTION_COUNT,
+  writePostSchema,
+  type WritePostFormValues,
+} from "@/features/write-post/model/schema.ts";
 import { CATEGORY_GROUPS } from "@/shared/constants/category.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import {
@@ -27,70 +37,41 @@ import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group.tsx";
 import { Separator } from "@/shared/ui/separator.tsx";
 import { Textarea } from "@/shared/ui/textarea.tsx";
 
-type VoteOption = {
-  id: string;
-  name: string;
-  description: string;
-  imageFile?: File;
-};
-
-const OPTION_COUNT = 2;
 export function WritePost() {
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [categoryId, setCategoryId] = useState(
-    CATEGORY_GROUPS[0]?.children[0]?.id ?? ""
-  );
-  const [isCategoryDrawerOpen, setIsCategoryDrawerOpen] = useState(false);
-  const [options, setOptions] = useState<VoteOption[]>(() =>
-    Array.from({ length: OPTION_COUNT }).map((_, index) => ({
-      id: `option-${index + 1}`,
+  const defaultCategoryId = CATEGORY_GROUPS[0]?.children[0]?.id ?? "";
+  const defaultOptions = Array.from({ length: OPTION_COUNT }).map(
+    (_, index) => ({
       name: `옵션 ${index + 1}`,
       description: "",
-    }))
+    })
   );
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    console.log({
-      title,
-      content,
-      categoryId,
-      options,
-    });
-  };
+  const [isCategoryDrawerOpen, setIsCategoryDrawerOpen] = useState(false);
+  const [optionFiles, setOptionFiles] = useState<Record<string, File | null>>(
+    {}
+  );
+  const form = useForm<WritePostFormValues>({
+    resolver: zodResolver(writePostSchema),
+    mode: "onChange",
+    defaultValues: {
+      title: "",
+      content: "",
+      categoryId: defaultCategoryId,
+      options: defaultOptions,
+    },
+  });
 
-  const handleOptionNameChange = (id: string, value: string) => {
-    setOptions((prev) =>
-      prev.map((option) =>
-        option.id === id ? { ...option, name: value } : option
-      )
-    );
-  };
+  const { control, formState, handleSubmit, register, reset, setValue } = form;
 
-  const handleOptionDescriptionChange = (id: string, value: string) => {
-    setOptions((prev) =>
-      prev.map((option) =>
-        option.id === id ? { ...option, description: value } : option
-      )
-    );
-  };
+  const { fields } = useFieldArray({
+    control,
+    name: "options",
+  });
 
-  const handleOptionImageChange = (id: string, file?: File) => {
-    setOptions((prev) =>
-      prev.map((option) =>
-        option.id === id ? { ...option, imageFile: file } : option
-      )
-    );
-  };
-
-  const isSubmitDisabled = useMemo(() => {
-    const hasEmptyOption = options.some(
-      (option) => !option.name.trim() || !option.description.trim()
-    );
-    return !title.trim() || !content.trim() || !categoryId || hasEmptyOption;
-  }, [title, content, options, categoryId]);
-
+  const categoryId = useWatch({
+    control,
+    name: "categoryId",
+  });
   const selectedCategory = (() => {
     for (const group of CATEGORY_GROUPS) {
       const category = group.children.find((child) => child.id === categoryId);
@@ -103,6 +84,33 @@ export function WritePost() {
     }
     return undefined;
   })();
+
+  const handleOptionImageChange = (id: string, file?: File) => {
+    setOptionFiles((prev) => ({
+      ...prev,
+      [id]: file ?? null,
+    }));
+  };
+
+  const onSubmit = async (values: WritePostFormValues) => {
+    try {
+      await createVote(values);
+      toast.success("투표가 성공적으로 생성되었습니다.");
+      reset({
+        title: "",
+        content: "",
+        categoryId: defaultCategoryId,
+        options: defaultOptions,
+      });
+      setOptionFiles({});
+    } catch (error) {
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error("알 수 없는 오류가 발생했습니다.");
+      }
+    }
+  };
 
   return (
     <section className="space-y-8">
@@ -119,7 +127,7 @@ export function WritePost() {
       </header>
 
       <form
-        onSubmit={handleSubmit}
+        onSubmit={handleSubmit(onSubmit)}
         className="grid gap-6 lg:grid-cols-[360px,1fr]"
       >
         <Card className="h-fit">
@@ -130,12 +138,12 @@ export function WritePost() {
           <CardContent className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="vote-title">투표 제목</Label>
-              <Input
-                id="vote-title"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                required
-              />
+              <Input id="vote-title" {...register("title")} />
+              {formState.errors.title ? (
+                <p className="text-xs text-destructive">
+                  {formState.errors.title.message}
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-2">
@@ -147,13 +155,16 @@ export function WritePost() {
               </div>
               <Textarea
                 id="vote-description"
-                value={content}
-                onChange={(event) => setContent(event.target.value)}
                 rows={8}
                 maxLength={500}
                 className="resize-none"
-                required
+                {...register("content")}
               />
+              {formState.errors.content ? (
+                <p className="text-xs text-destructive">
+                  {formState.errors.content.message}
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-2">
@@ -189,7 +200,10 @@ export function WritePost() {
                     <RadioGroup
                       value={categoryId}
                       onValueChange={(value) => {
-                        setCategoryId(value);
+                        setValue("categoryId", value, {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        });
                         setIsCategoryDrawerOpen(false);
                       }}
                       className="gap-4"
@@ -223,6 +237,11 @@ export function WritePost() {
                   </div>
                 </DrawerContent>
               </Drawer>
+              {formState.errors.categoryId ? (
+                <p className="text-xs text-destructive">
+                  {formState.errors.categoryId.message}
+                </p>
+              ) : null}
             </div>
 
             <Separator />
@@ -245,100 +264,107 @@ export function WritePost() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {options.map((option, index) => (
-              <div
-                key={option.id}
-                className="rounded-xl border border-dashed p-4"
-              >
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      옵션 {index + 1}
-                    </p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    필수 입력
-                  </span>
-                </div>
+            {fields.map((field, index) => {
+              const optionFile = optionFiles[field.id];
 
-                <div className="space-y-3">
-                  <div className="space-y-2">
-                    <Label htmlFor={`${option.id}-name`}>제목</Label>
-                    <Input
-                      id={`${option.id}-name`}
-                      value={option.name}
-                      onChange={(event) =>
-                        handleOptionNameChange(option.id, event.target.value)
-                      }
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor={`${option.id}-description`}>내용</Label>
-                    <Textarea
-                      id={`${option.id}-description`}
-                      value={option.description}
-                      onChange={(event) =>
-                        handleOptionDescriptionChange(
-                          option.id,
-                          event.target.value
-                        )
-                      }
-                      rows={6}
-                      required
-                      className="resize-none"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor={`${option.id}-image`}>
-                      사진 첨부 (선택)
-                    </Label>
-                    <Input
-                      id={`${option.id}-image`}
-                      type="file"
-                      accept="image/*"
-                      onChange={(event) =>
-                        handleOptionImageChange(
-                          option.id,
-                          event.target.files?.[0]
-                        )
-                      }
-                      className="cursor-pointer"
-                    />
-                    {option.imageFile ? (
-                      <div className="flex items-center justify-between rounded-lg border bg-muted/40 p-3 text-sm">
-                        <div className="flex items-center gap-2">
-                          <ImagePlus className="size-4 text-muted-foreground" />
-                          <div>
-                            <p className="font-medium text-ellipsis overflow-hidden whitespace-nowrap max-w-[200px]">
-                              {option.imageFile.name}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {Math.round(option.imageFile.size / 1024)}KB
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOptionImageChange(option.id)}
-                        >
-                          <Trash2 className="size-4" />
-                          <span className="sr-only">이미지 삭제</span>
-                        </Button>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        PNG, JPG, GIF 이미지를 업로드할 수 있습니다. 최대 5MB.
+              return (
+                <div
+                  key={field.id}
+                  className="rounded-xl border border-dashed p-4"
+                >
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        옵션 {index + 1}
                       </p>
-                    )}
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      필수 입력
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor={`${field.id}-name`}>제목</Label>
+                      <Input
+                        id={`${field.id}-name`}
+                        {...register(`options.${index}.name`)}
+                      />
+                      {formState.errors.options?.[index]?.name?.message ? (
+                        <p className="text-xs text-destructive">
+                          {formState.errors.options[index]?.name?.message}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`${field.id}-description`}>내용</Label>
+                      <Textarea
+                        id={`${field.id}-description`}
+                        rows={6}
+                        className="resize-none"
+                        {...register(`options.${index}.description`)}
+                      />
+                      {formState.errors.options?.[index]?.description
+                        ?.message ? (
+                        <p className="text-xs text-destructive">
+                          {
+                            formState.errors.options[index]?.description
+                              ?.message
+                          }
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`${field.id}-image`}>
+                        사진 첨부 (선택)
+                      </Label>
+                      <Input
+                        id={`${field.id}-image`}
+                        type="file"
+                        accept="image/*"
+                        onChange={(event) =>
+                          handleOptionImageChange(
+                            field.id,
+                            event.target.files?.[0]
+                          )
+                        }
+                        className="cursor-pointer"
+                      />
+                      {optionFile ? (
+                        <div className="flex items-center justify-between rounded-lg border bg-muted/40 p-3 text-sm">
+                          <div className="flex items-center gap-2">
+                            <ImagePlus className="size-4 text-muted-foreground" />
+                            <div>
+                              <p className="max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap font-medium">
+                                {optionFile.name}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {Math.round(optionFile.size / 1024)}KB
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOptionImageChange(field.id)}
+                          >
+                            <Trash2 className="size-4" />
+                            <span className="sr-only">이미지 삭제</span>
+                          </Button>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          PNG, JPG, GIF 이미지를 업로드할 수 있습니다. 최대 5MB.
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
 
@@ -347,8 +373,11 @@ export function WritePost() {
             <Button type="button" variant="outline" asChild>
               <Link href="/">취소</Link>
             </Button>
-            <Button type="submit" disabled={isSubmitDisabled}>
-              투표 생성하기
+            <Button
+              type="submit"
+              disabled={!formState.isValid || formState.isSubmitting}
+            >
+              {formState.isSubmitting ? "생성 중..." : "투표 생성하기"}
             </Button>
           </div>
         </div>
