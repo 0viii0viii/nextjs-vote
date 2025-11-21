@@ -11,6 +11,7 @@ export const voteOptionSchema = z.object({
     .string()
     .min(1, "옵션 설명을 입력하세요.")
     .max(500, "옵션 설명은 500자 이하로 입력하세요."),
+  imageUrl: z.string().url().optional().or(z.literal("")),
 });
 
 export const writePostSchema = z.object({

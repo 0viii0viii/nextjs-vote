@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowLeft, ImagePlus, Trash2 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
@@ -43,6 +44,7 @@ export function WritePost() {
     (_, index) => ({
       name: `옵션 ${index + 1}`,
       description: "",
+      imageUrl: "",
     })
   );
 
@@ -92,9 +94,51 @@ export function WritePost() {
     }));
   };
 
+  const uploadImage = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch("/api/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result?.message ?? "이미지 업로드에 실패했습니다.");
+    }
+
+    return result.url;
+  };
+
   const onSubmit = async (values: WritePostFormValues) => {
     try {
-      await createVote(values);
+      // 이미지 업로드 처리
+      const optionsWithImages = await Promise.all(
+        values.options.map(async (option, index) => {
+          const fieldId = fields[index]?.id;
+          const file = fieldId ? optionFiles[fieldId] : null;
+
+          if (file) {
+            try {
+              const imageUrl = await uploadImage(file);
+              return { ...option, imageUrl };
+            } catch (error) {
+              if (error instanceof Error) {
+                toast.error(
+                  `옵션 ${index + 1} 이미지 업로드 실패: ${error.message}`
+                );
+              }
+              throw error;
+            }
+          }
+
+          return { ...option, imageUrl: "" };
+        })
+      );
+
+      await createVote({ ...values, options: optionsWithImages });
       toast.success("투표가 성공적으로 생성되었습니다.");
       reset({
         title: "",
@@ -298,25 +342,6 @@ export function WritePost() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor={`${field.id}-description`}>내용</Label>
-                      <Textarea
-                        id={`${field.id}-description`}
-                        rows={6}
-                        className="resize-none"
-                        {...register(`options.${index}.description`)}
-                      />
-                      {formState.errors.options?.[index]?.description
-                        ?.message ? (
-                        <p className="text-xs text-destructive">
-                          {
-                            formState.errors.options[index]?.description
-                              ?.message
-                          }
-                        </p>
-                      ) : null}
-                    </div>
-
-                    <div className="space-y-2">
                       <Label htmlFor={`${field.id}-image`}>
                         사진 첨부 (선택)
                       </Label>
@@ -333,33 +358,64 @@ export function WritePost() {
                         className="cursor-pointer"
                       />
                       {optionFile ? (
-                        <div className="flex items-center justify-between rounded-lg border bg-muted/40 p-3 text-sm">
-                          <div className="flex items-center gap-2">
-                            <ImagePlus className="size-4 text-muted-foreground" />
-                            <div>
-                              <p className="max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap font-medium">
-                                {optionFile.name}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {Math.round(optionFile.size / 1024)}KB
-                              </p>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between rounded-lg border bg-muted/40 p-3 text-sm">
+                            <div className="flex items-center gap-2">
+                              <ImagePlus className="size-4 text-muted-foreground" />
+                              <div>
+                                <p className="max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap font-medium">
+                                  {optionFile.name}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {Math.round(optionFile.size / 1024)}KB
+                                </p>
+                              </div>
                             </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleOptionImageChange(field.id)}
+                            >
+                              <Trash2 className="size-4" />
+                              <span className="sr-only">이미지 삭제</span>
+                            </Button>
                           </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOptionImageChange(field.id)}
-                          >
-                            <Trash2 className="size-4" />
-                            <span className="sr-only">이미지 삭제</span>
-                          </Button>
+                          <div className="relative aspect-video w-full overflow-hidden rounded-lg border">
+                            <Image
+                              src={URL.createObjectURL(optionFile)}
+                              alt={`옵션 ${index + 1} 미리보기`}
+                              fill
+                              className="object-cover"
+                              unoptimized
+                            />
+                          </div>
                         </div>
                       ) : (
                         <p className="text-xs text-muted-foreground">
-                          PNG, JPG, GIF 이미지를 업로드할 수 있습니다. 최대 5MB.
+                          PNG, JPG, JPEG, GIF, WebP 이미지만 업로드할 수 있으며
+                          최대 5MB까지 허용됩니다.
                         </p>
                       )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`${field.id}-description`}>내용</Label>
+                      <Textarea
+                        id={`${field.id}-description`}
+                        rows={6}
+                        className="resize-none"
+                        {...register(`options.${index}.description`)}
+                      />
+                      {formState.errors.options?.[index]?.description
+                        ?.message ? (
+                        <p className="text-xs text-destructive">
+                          {
+                            formState.errors.options[index]?.description
+                              ?.message
+                          }
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 </div>

@@ -41,6 +41,7 @@ export async function POST(request: Request) {
       name: option.name,
       description: option.description,
       display_order: index,
+      image_url: option.imageUrl || null,
     }));
 
     const { error: optionError } = await supabase
