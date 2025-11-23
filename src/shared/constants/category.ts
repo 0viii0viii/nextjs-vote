@@ -8,6 +8,11 @@ export type CategoryGroup = {
   }>;
 };
 
+export type CategoryOption = {
+  id: string;
+  label: string;
+};
+
 export const CATEGORY_GROUPS: CategoryGroup[] = [
   {
     id: "shopping",
@@ -24,3 +29,23 @@ export const CATEGORY_GROUPS: CategoryGroup[] = [
     ],
   },
 ];
+
+export const CATEGORY_OPTIONS: CategoryOption[] = [
+  {
+    id: "all",
+    label: "전체",
+  },
+  ...CATEGORY_GROUPS.flatMap((group) => group.children),
+];
+
+const CATEGORY_LOOKUP = CATEGORY_OPTIONS.reduce<Record<string, string>>(
+  (acc, option) => {
+    acc[option.id] = option.label;
+    return acc;
+  },
+  {}
+);
+
+export function getCategoryLabel(categoryId: string) {
+  return CATEGORY_LOOKUP[categoryId] ?? "기타";
+}
