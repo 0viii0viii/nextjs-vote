@@ -4,9 +4,9 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/shared/lib/supabase/server-client.ts";
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     voteId: string;
-  };
+  }>;
 };
 
 export async function POST(request: Request, context: RouteContext) {
@@ -20,7 +20,7 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    const voteId = context.params.voteId;
+    const { voteId } = await context.params;
 
     if (!voteId) {
       return NextResponse.json(

@@ -28,4 +28,3 @@ export type VoteComment = {
   userId: string;
   createdAt: string;
 };
-

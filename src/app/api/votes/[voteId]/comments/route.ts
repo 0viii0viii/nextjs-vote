@@ -12,14 +12,14 @@ const commentSchema = z.object({
 });
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     voteId: string;
-  };
+  }>;
 };
 
 export async function GET(request: Request, context: RouteContext) {
   try {
-    const voteId = context.params.voteId;
+    const { voteId } = await context.params;
     if (!voteId) {
       return NextResponse.json(
         { message: "투표 ID가 필요합니다." },
@@ -74,7 +74,7 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    const voteId = context.params.voteId;
+    const { voteId } = await context.params;
     if (!voteId) {
       return NextResponse.json(
         { message: "투표 ID가 필요합니다." },
@@ -134,4 +134,3 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 }
-

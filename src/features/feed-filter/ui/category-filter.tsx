@@ -1,9 +1,12 @@
-import { CATEGORY_OPTIONS } from "@/shared/constants/category.ts";
+import { CATEGORY_GROUPS } from "@/shared/constants/category.ts";
 import { Label } from "@/shared/ui/label.tsx";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/shared/ui/select.tsx";
@@ -22,14 +25,22 @@ export function CategoryFilter({ value, onChange }: CategoryFilterProps) {
           <SelectValue placeholder="카테고리를 선택하세요" />
         </SelectTrigger>
         <SelectContent>
-          {CATEGORY_OPTIONS.map((option) => (
-            <SelectItem key={option.id} value={option.id}>
-              {option.label}
-            </SelectItem>
+          <SelectItem key="all" value="all">
+            전체
+          </SelectItem>
+          <SelectSeparator />
+          {CATEGORY_GROUPS.map((group) => (
+            <SelectGroup key={group.id}>
+              <SelectLabel>{group.label}</SelectLabel>
+              {group.children.map((child) => (
+                <SelectItem key={child.id} value={child.id}>
+                  <span>{child.label}</span>
+                </SelectItem>
+              ))}
+            </SelectGroup>
           ))}
         </SelectContent>
       </Select>
     </div>
   );
 }
-

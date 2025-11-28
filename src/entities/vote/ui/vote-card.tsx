@@ -58,6 +58,7 @@ export function VoteCard({
                 option={option}
                 totalParticipants={vote.totalParticipants}
                 isSelected={vote.userOptionId === option.id}
+                hasVoted={Boolean(vote.userOptionId)}
                 disabled={
                   Boolean(votePendingOptionId) &&
                   votePendingOptionId !== option.id &&
@@ -105,6 +106,7 @@ type VoteOptionRowProps = {
   option: VoteOptionStats;
   totalParticipants: number;
   isSelected: boolean;
+  hasVoted: boolean;
   disabled: boolean;
   onSelect: () => void;
 };
@@ -113,6 +115,7 @@ function VoteOptionRow({
   option,
   totalParticipants,
   isSelected,
+  hasVoted,
   disabled,
   onSelect,
 }: VoteOptionRowProps) {
@@ -121,22 +124,17 @@ function VoteOptionRow({
       ? Math.round((option.voteCount / totalParticipants) * 100)
       : 0;
 
+  const shouldDimOption = hasVoted && !isSelected;
+
   return (
     <div
       className={cn(
-        "space-y-2 rounded-xl border p-4 transition hover:border-primary",
-        isSelected && "border-primary bg-primary/5"
+        "space-y-2 rounded-xl border p-4 transition",
+        isSelected && "border-primary bg-primary/5",
+        shouldDimOption ? "opacity-60" : "hover:border-primary"
       )}
     >
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={onSelect}
-        className={cn(
-          "flex w-full flex-col gap-3 text-left",
-          disabled && "cursor-not-allowed opacity-90"
-        )}
-      >
+      <div className="flex w-full flex-col gap-3">
         <div className="flex flex-col gap-3 md:flex-row md:items-center">
           <div className="flex-1 space-y-1">
             <p className="text-lg font-semibold">{option.name}</p>
@@ -146,12 +144,26 @@ function VoteOptionRow({
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="text-right">
-              <p className="text-xl font-bold">{percent}%</p>
-              <p className="text-xs text-muted-foreground">
-                {option.voteCount.toLocaleString()}명 선택
-              </p>
-            </div>
+            {hasVoted ? (
+              <div className="text-right">
+                <p className="text-xl font-bold">{percent}%</p>
+                <p className="text-xs text-muted-foreground">
+                  {option.voteCount.toLocaleString()}명 선택
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="default"
+                  onClick={onSelect}
+                  disabled={disabled}
+                >
+                  투표하기
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -161,22 +173,24 @@ function VoteOptionRow({
               src={option.imageUrl}
               alt={`${option.name} 이미지`}
               fill
-              className="object-cover"
+              className="object-contain"
               sizes="(max-width: 768px) 100vw, 50vw"
             />
           </div>
         ) : null}
-      </button>
-
-      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-        <div
-          className={cn(
-            "h-full rounded-full transition-all",
-            isSelected ? "bg-primary" : "bg-primary/60"
-          )}
-          style={{ width: `${percent}%` }}
-        />
       </div>
+
+      {hasVoted && (
+        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className={cn(
+              "h-full rounded-full transition-all",
+              isSelected ? "bg-primary" : "bg-primary/60"
+            )}
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 }
